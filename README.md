@@ -24,8 +24,8 @@ Search • Check • Sort
 ## 🎥 Demo
 
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=VIDEO_ID">
-    <img src="https://img.youtube.com/vi/VIDEO_ID/maxresdefault.jpg" width="800">
+  <a href="https://www.youtube.com/watch?v=GxOBbFuRJS0">
+    <img src="https://img.youtube.com/vi/GxOBbFuRJS0/maxresdefault.jpg" width="800">
     ▶ Click to watch full demo on YouTube
   </a>
 </p>
