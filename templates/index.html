@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Telegram Parser</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div class="container">
+
+<header>
+    <h1>Telegram Parser</h1>
+    <p class="subtitle">Search · Check · Sort</p>
+</header>
+
+<!-- TELEGRAM AUTH -->
+<div class="card" id="tg-auth" style="display:none;">
+    <div class="card-title">Telegram авторизация</div>
+
+    <!-- STEP 1 -->
+    <div id="tg-step-phone">
+        <div class="parser-grid-2">
+            <input class="setup-input" id="api_id" placeholder="API ID">
+            <input class="setup-input" id="api_hash" placeholder="API HASH">
+        </div>
+        <input class="setup-input" id="phone" placeholder="+79998887766">
+        <div class="toolbar">
+            <button class="tool-btn" onclick="sendCode()">Отправить код</button>
+        </div>
+    </div>
+
+    <hr>
+
+    <!-- STEP 2 -->
+    <div id="tg-step-code" style="display:none;">
+        <div class="parser-grid-2">
+            <input class="setup-input" id="code" placeholder="Код из Telegram">
+            <input class="setup-input" id="password" placeholder="2FA пароль">
+        </div>
+        <div class="toolbar">
+            <button class="tool-btn" onclick="confirmCode()">Подтвердить</button>
+        </div>
+    </div>
+</div>
+
+<!-- SEARCH -->
+<div class="card">
+    <div class="card-title">Поиск</div>
+
+    <form id="run-form">
+        <textarea name="queries" class="setup-input" rows="4"
+                  placeholder="школа&#10;кейпоп"></textarea>
+
+        <div class="toolbar">
+            <button class="tool-btn" >▶ Запустить</button>
+            <a href="/export/excel" class="tool-btn">💾 Экспорт в Excel</a>
+            <button class="tool-btn" onclick="recheckEmpty()" type="button">🔄 Перепроверить пустые</button>
+            <button class="tool-btn danger" onclick="clearResults()" type="button">🗑 Очистить результаты</button>
+            <div style="margin-left:auto;">
+                Статус:
+                <span id="status">{{ progress.done }} / {{ progress.total }}</span>
+            </div>
+        </div>
+    </form>
+
+    <pre id="log" class="analysis"></pre>
+</div>
+
+<!-- RESULTS -->
+<div class="card">
+    <div class="card-title">Результаты</div>
+    <table class="parser-table" id="resultTable">
+        <thead>
+        <tr>
+            <th>@</th><th>Название</th><th>Подписчики</th><th>Тип</th>
+        </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+</div>
+
+<script>
+const wsock = new WebSocket(`ws://${location.host}/ws`);
+
+wsock.onmessage = (e) => {
+    const d = JSON.parse(e.data);
+
+    document.getElementById("status").textContent =
+        `${d.progress.done} / ${d.progress.total}`;
+
+    document.getElementById("log").textContent =
+        d.log.join("\n");
+
+    const tg = document.getElementById("tg-auth");
+    const stepPhone = document.getElementById("tg-step-phone");
+    const stepCode = document.getElementById("tg-step-code");
+
+    if (d.telegram_ready) {
+        tg.style.display = "none";
+    } else {
+        tg.style.display = "block";
+        stepPhone.style.display = d.telegram_code_sent ? "none" : "block";
+        stepCode.style.display = d.telegram_code_sent ? "block" : "none";
+    }
+
+    const tbody = document.querySelector("#resultTable tbody");
+    tbody.innerHTML = "";
+    for (const r of d.rows || []) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td><a href="${r[1]}" target="_blank">@${r[0]}</a></td>
+            <td>${r[2] || "—"}</td>
+            <td>${r[3]}</td>
+            <td>${r[4]}</td>
+        `;
+        tbody.appendChild(tr);
+    }
+};
+
+async function sendCode() {
+    const f = new FormData();
+    f.append("api_id", api_id.value);
+    f.append("api_hash", api_hash.value);
+    f.append("phone", phone.value);
+    await fetch("/tg/send_code", { method:"POST", body:f });
+}
+
+async function confirmCode() {
+    const f = new FormData();
+    f.append("code", code.value);
+    f.append("password", password.value);
+
+    const r = await fetch("/tg/confirm", { method:"POST", body:f });
+    if (!r.ok) {
+        const e = await r.json();
+        if (e.detail === "CODE_EXPIRED") {
+            alert("Код истёк. Запросите новый.");
+        } else if (e.detail === "CODE_INVALID") {
+            alert("Неверный код.");
+        }
+    }
+}
+
+async function recheckEmpty() {
+    await fetch("/recheck_empty", { method: "POST" });
+}
+
+document.getElementById("run-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const form = e.target;
+    const fd = new FormData(form);
+
+    await fetch("/run", {
+        method: "POST",
+        body: fd
+    });
+});
+
+async function clearResults() {
+    if (!confirm("Точно очистить все результаты?")) return;
+    await fetch("/clear_results", { method: "POST" });
+}
+</script>
+
+</body>
+</html>
